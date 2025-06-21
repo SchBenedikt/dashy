@@ -1,0 +1,2 @@
+# dashy
+Nextcloud Dashboard App
