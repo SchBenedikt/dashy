@@ -1,0 +1,72 @@
+{
+  "name": "rollup-plugin-esbuild-minify",
+  "version": "1.3.0",
+  "description": "Rollup plugin to minify or clean up generated bundles using esbuild.",
+  "author": "Ferdinand Prantl <prantlf@gmail.com> (http://prantl.tk)",
+  "license": "MIT",
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://github.com/prantlf/rollup-plugin-esbuild-minify/blob/master/LICENSE"
+    }
+  ],
+  "homepage": "http://github.com/prantlf/rollup-plugin-esbuild-minify/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prantlf/rollup-plugin-esbuild-minify.git"
+  },
+  "bugs": {
+    "url": "http://github.com/prantlf/rollup-plugin-esbuild-minify/issues"
+  },
+  "type": "module",
+  "module": "lib/index.js",
+  "main": "lib/index.cjs",
+  "exports": {
+    "require": "./lib/index.cjs",
+    "import": "./lib/index.js"
+  },
+  "files": [
+    "lib"
+  ],
+  "engines": {
+    "node": ">= 14.18"
+  },
+  "scripts": {
+    "prepare": "rollup -c",
+    "lint": "biome lint *.js lib test",
+    "check": "node test",
+    "cover": "c8 node test",
+    "test": "biome lint *.js lib test && c8 node test"
+  },
+  "c8": {
+    "check-coverage": true,
+    "reporter": [
+      "text",
+      "lcov"
+    ],
+    "branches": 100,
+    "lines": 100,
+    "functions": 100,
+    "statements": 100
+  },
+  "dependencies": {
+    "esbuild": "^0.25.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "c8": "^10.1.3",
+    "rollup": "^4.40.0",
+    "tehanu": "^1.0.1",
+    "tehanu-repo-coco": "^1.0.1"
+  },
+  "peerDependencies": {
+    "rollup": "^2 || ^3 || ^4"
+  },
+  "keywords": [
+    "rollup",
+    "plugin",
+    "rollup-plugin",
+    "minify",
+    "esbuild"
+  ]
+}
