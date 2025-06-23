@@ -1,4 +1,4 @@
-<template>
+^<template>
   <div class="notes-settings">
     <!-- Settings triggered from widget header -->
     <div class="notes-settings-modal" v-if="showModal" @click.self="closeModal">
