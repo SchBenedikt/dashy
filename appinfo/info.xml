@@ -7,10 +7,10 @@
 	<description>dashy</description>
 	<version>1.0.0</version>
 	<licence>agpl</licence>
-	<author mail="benedikt.schaechner@web.de" homepage="">Benedikt Schächner</author>
+	<author mail="benedikt.schaechner@web.de" homepage="https://github.com/SchBenedikt/dashy">Benedikt Schächner</author>
 	<namespace>Dashy</namespace>
 	<category>dashboard</category>
-	<bugs>https://dashy.schächner.de</bugs>
+	<bugs>https://github.com/SchBenedikt/dashy/issues</bugs>
 	<dependencies>
 		<nextcloud min-version="29" max-version="33"/>
 	</dependencies>

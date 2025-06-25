@@ -13,6 +13,7 @@ use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\IConfig;
 use OCP\IDBConnection;
 use OCP\IRequest;
+use OCP\Files\IRootFolder;
 use OCP\IUserSession;
 
 class Application extends App implements IBootstrap {
@@ -32,7 +33,8 @@ class Application extends App implements IBootstrap {
 				$c->get(IConfig::class),
 				$c->get(IDBConnection::class),
 				$c->get(IUserSession::class),
-				$c->get(\OCP\App\IAppManager::class)
+				$c->get(\OCP\App\IAppManager::class),
+				$c->get(\OCP\Files\IRootFolder::class)
 			);
 		});
 		

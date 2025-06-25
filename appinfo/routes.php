@@ -26,13 +26,13 @@ return [
 		
 		// Files integration
 		['name' => 'api#getFiles', 'url' => '/api/files', 'verb' => 'GET'],
+		['name' => 'api#getFolders', 'url' => '/api/folders', 'verb' => 'GET'],
 		
 		// Notes integration
 		['name' => 'api#getNotes', 'url' => '/api/notes', 'verb' => 'GET'],
 		['name' => 'api#createNote', 'url' => '/api/notes', 'verb' => 'POST'],
 		['name' => 'api#updateNote', 'url' => '/api/notes/{noteId}', 'verb' => 'PUT'],
 		['name' => 'api#getNotesFolders', 'url' => '/api/notes/folders', 'verb' => 'GET'],
-		['name' => 'api#browseFolders', 'url' => '/api/folders/browse', 'verb' => 'GET'],
 		
 		// Bookmarks integration
 		['name' => 'api#getBookmarks', 'url' => '/api/bookmarks', 'verb' => 'GET'],

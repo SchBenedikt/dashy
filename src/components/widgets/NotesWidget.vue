@@ -66,7 +66,7 @@
 						v-for="note in displayedNotes.slice(0, settings.maxNotes || 10)" 
 						:key="note.id"
 						class="note-item"
-						@click="openNote(note)"
+						@click="showNotePreview(note)"
 					>
 						<div class="note-icon">
 							<NoteTextIcon :size="24" />
@@ -76,7 +76,7 @@
 							<div class="note-preview">{{ getPreview(note.content) }}</div>
 							<div class="note-meta">
 								<span class="note-category" v-if="note.category">{{ note.category }}</span>
-								<span class="note-modified">{{ formatDate(note.modified) }}</span>
+								<span class="note-created">{{ formatDate(note.created || note.modified) }}</span>
 							</div>
 						</div>
 						<div class="note-actions">
@@ -95,42 +95,12 @@
 			</div>
 		</div>
 
-		<!-- Quick Note Modal -->
-		<NcDialog
-			v-if="showQuickNote"
-			:name="t('dashy', 'Quick Note')"
-			@closing="closeQuickNote"
-		>
-			<div class="quick-note-content">
-				<input
-					v-model="quickNote.title"
-					type="text"
-					:placeholder="t('dashy', 'Note title...')"
-					class="note-title-input"
-				>
-				<textarea
-					v-model="quickNote.content"
-					:placeholder="t('dashy', 'Write your note here...')"
-					class="note-content-input"
-					rows="6"
-				></textarea>
-			</div>
 
-			<template #actions>
-				<NcButton @click="closeQuickNote">
-					{{ t('dashy', 'Cancel') }}
-				</NcButton>
-				<NcButton type="primary" @click="saveQuickNote">
-					{{ t('dashy', 'Save Note') }}
-				</NcButton>
-			</template>
-		</NcDialog>
 	</div>
 </template>
 
 <script>
 import NcButton from '@nextcloud/vue/dist/Components/NcButton.js'
-import NcDialog from '@nextcloud/vue/dist/Components/NcDialog.js'
 import NcLoadingIcon from '@nextcloud/vue/dist/Components/NcLoadingIcon.js'
 import NoteTextIcon from 'vue-material-design-icons/NoteText.vue'
 import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
@@ -146,7 +116,6 @@ export default {
 	name: 'NotesWidget',
 	components: {
 		NcButton,
-		NcDialog,
 		NcLoadingIcon,
 		NoteTextIcon,
 		AlertCircleIcon,
@@ -171,10 +140,15 @@ export default {
 			loading: true,
 			error: null,
 			showQuickNote: false,
+			showPreview: false,
 			quickNote: {
 				title: '',
 				content: '',
+				id: null,
 			},
+			previewNote: {},
+			noteModalElement: null,
+			previewModalElement: null,
 		}
 	},
 	computed: {
@@ -194,6 +168,10 @@ export default {
 	},
 	async mounted() {
 		await this.loadNotes()
+	},
+	beforeDestroy() {
+		this.removeNoteModal()
+		this.removePreviewModal()
 	},
 	methods: {
 		t,
@@ -239,21 +217,15 @@ export default {
 			if (!timestamp) return ''
 			
 			const date = new Date(timestamp * 1000)
-			const now = new Date()
-			const diff = now - date
 			
-			// Less than 24 hours ago
-			if (diff < 24 * 60 * 60 * 1000) {
-				return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-			}
+			// Format as DD.MM.YY, HH:MM
+			const day = String(date.getDate()).padStart(2, '0')
+			const month = String(date.getMonth() + 1).padStart(2, '0')
+			const year = String(date.getFullYear()).substring(2)
+			const hours = String(date.getHours()).padStart(2, '0')
+			const minutes = String(date.getMinutes()).padStart(2, '0')
 			
-			// Less than a week ago
-			if (diff < 7 * 24 * 60 * 60 * 1000) {
-				return date.toLocaleDateString([], { weekday: 'short' })
-			}
-			
-			// Older
-			return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+			return `${day}.${month}.${year}, ${hours}:${minutes}`
 		},
 		openNote(note) {
 			// Open note in Notes app or text editor
@@ -271,13 +243,16 @@ export default {
 				content: note.content || '',
 			}
 			this.showQuickNote = true
+			this.createNoteModal()
 		},
 		createNote() {
 			this.quickNote = {
 				title: '',
 				content: '',
+				id: null,
 			}
 			this.showQuickNote = true
+			this.createNoteModal()
 		},
 		openNotesApp() {
 			if (this.isNotesAppAvailable()) {
@@ -289,13 +264,142 @@ export default {
 		},
 		closeQuickNote() {
 			this.showQuickNote = false
-			this.quickNote = { title: '', content: '' }
+			this.removeNoteModal()
+			this.quickNote = { title: '', content: '', id: null }
+		},
+		
+		handleNoteModalEscapeKey(event) {
+			if (event.key === 'Escape' && this.showQuickNote) {
+				this.closeQuickNote()
+			}
+		},
+		
+		createNoteModal() {
+			if (this.noteModalElement) return
+			
+			document.addEventListener('keydown', this.handleNoteModalEscapeKey)
+			
+			this.noteModalElement = document.createElement('div')
+			this.noteModalElement.className = 'note-editor-overlay'
+			this.noteModalElement.addEventListener('click', this.handleNoteModalOverlayClick)
+			
+			const modalContent = document.createElement('div')
+			modalContent.className = 'note-editor-modal'
+			modalContent.addEventListener('click', (e) => e.stopPropagation())
+			
+			modalContent.innerHTML = this.getNoteModalHTML()
+			this.noteModalElement.appendChild(modalContent)
+			
+			document.body.appendChild(this.noteModalElement)
+			this.bindNoteModalEvents()
+			
+			// Focus title input
+			setTimeout(() => {
+				const titleInput = this.noteModalElement.querySelector('#note-title')
+				if (titleInput) {
+					titleInput.focus()
+					if (this.quickNote.title) {
+						titleInput.select()
+					}
+				}
+			}, 100)
+		},
+		
+		removeNoteModal() {
+			if (this.noteModalElement) {
+				document.removeEventListener('keydown', this.handleNoteModalEscapeKey)
+				this.noteModalElement.removeEventListener('click', this.handleNoteModalOverlayClick)
+				document.body.removeChild(this.noteModalElement)
+				this.noteModalElement = null
+			}
+		},
+		
+		handleNoteModalOverlayClick() {
+			this.closeQuickNote()
+		},
+		
+		getNoteModalHTML() {
+			return `
+				<div class="modal-header">
+					<h3>${this.quickNote.id ? this.t('dashy', 'Edit Note') : this.t('dashy', 'Create Note')}</h3>
+					<button class="close-btn" type="button" title="Close">✕</button>
+				</div>
+				<div class="modal-content">
+					<form class="note-form">
+						<div class="form-group">
+							<label for="note-title">${this.t('dashy', 'Title')}</label>
+							<input
+								id="note-title"
+								type="text"
+								placeholder="${this.t('dashy', 'Note title...')}"
+								value="${this.quickNote.title}"
+								class="note-title-input"
+							>
+						</div>
+						<div class="form-group">
+							<label for="note-content">${this.t('dashy', 'Content')}</label>
+							<textarea
+								id="note-content"
+								placeholder="${this.t('dashy', 'Write your note here...')}"
+								rows="12"
+								class="note-content-input"
+							>${this.quickNote.content}</textarea>
+						</div>
+						<div class="form-actions">
+							<button type="button" class="btn-cancel">${this.t('dashy', 'Cancel')}</button>
+							<button type="submit" class="btn-save">${this.t('dashy', 'Save Note')}</button>
+						</div>
+					</form>
+				</div>
+			`
+		},
+		
+		bindNoteModalEvents() {
+			if (!this.noteModalElement) return
+			
+			const form = this.noteModalElement.querySelector('.note-form')
+			form.addEventListener('submit', (e) => {
+				e.preventDefault()
+				this.saveQuickNote()
+			})
+			
+			const closeBtn = this.noteModalElement.querySelector('.close-btn')
+			if (closeBtn) {
+				closeBtn.addEventListener('click', (e) => {
+					e.preventDefault()
+					e.stopPropagation()
+					this.closeQuickNote()
+				})
+			}
+			
+			const cancelBtn = this.noteModalElement.querySelector('.btn-cancel')
+			if (cancelBtn) {
+				cancelBtn.addEventListener('click', (e) => {
+					e.preventDefault()
+					this.closeQuickNote()
+				})
+			}
+			
+			// Input change handlers
+			const titleInput = this.noteModalElement.querySelector('#note-title')
+			const contentTextarea = this.noteModalElement.querySelector('#note-content')
+			
+			titleInput?.addEventListener('input', (e) => {
+				this.quickNote.title = e.target.value
+			})
+			contentTextarea?.addEventListener('input', (e) => {
+				this.quickNote.content = e.target.value
+			})
 		},
 		async saveQuickNote() {
 			try {
+				// Get current values from form
+				const titleInput = this.noteModalElement.querySelector('#note-title')
+				const contentTextarea = this.noteModalElement.querySelector('#note-content')
+				
 				const noteData = {
-					title: this.quickNote.title || t('dashy', 'Untitled'),
-					content: this.quickNote.content,
+					title: titleInput.value || this.t('dashy', 'Untitled'),
+					content: contentTextarea.value,
 					folder: this.settings.notesFolder || '',
 				}
 				
@@ -317,6 +421,112 @@ export default {
 		isNotesAppAvailable() {
 			// Check if Notes app is available (simplified check)
 			return document.querySelector('a[href*="/apps/notes"]') !== null
+		},
+		showNotePreview(note) {
+			this.previewNote = { ...note }
+			this.showPreview = true
+			this.createPreviewModal()
+		},
+		closeNotePreview() {
+			this.showPreview = false
+			this.removePreviewModal()
+			this.previewNote = {}
+		},
+		editPreviewNote() {
+			this.editNote(this.previewNote)
+			this.closeNotePreview()
+		},
+		
+		handlePreviewModalEscapeKey(event) {
+			if (event.key === 'Escape' && this.showPreview) {
+				this.closeNotePreview()
+			}
+		},
+		
+		createPreviewModal() {
+			if (this.previewModalElement) return
+			
+			document.addEventListener('keydown', this.handlePreviewModalEscapeKey)
+			
+			this.previewModalElement = document.createElement('div')
+			this.previewModalElement.className = 'note-preview-overlay'
+			this.previewModalElement.addEventListener('click', this.handlePreviewModalOverlayClick)
+			
+			const modalContent = document.createElement('div')
+			modalContent.className = 'note-preview-modal'
+			modalContent.addEventListener('click', (e) => e.stopPropagation())
+			
+			modalContent.innerHTML = this.getPreviewModalHTML()
+			this.previewModalElement.appendChild(modalContent)
+			
+			document.body.appendChild(this.previewModalElement)
+			this.bindPreviewModalEvents()
+		},
+		
+		removePreviewModal() {
+			if (this.previewModalElement) {
+				document.removeEventListener('keydown', this.handlePreviewModalEscapeKey)
+				this.previewModalElement.removeEventListener('click', this.handlePreviewModalOverlayClick)
+				document.body.removeChild(this.previewModalElement)
+				this.previewModalElement = null
+			}
+		},
+		
+		handlePreviewModalOverlayClick() {
+			this.closeNotePreview()
+		},
+		
+		getPreviewModalHTML() {
+			return `
+				<div class="modal-header">
+					<h3>${this.previewNote.title || this.t('dashy', 'Untitled')}</h3>
+					<button class="close-btn" type="button" title="Close">✕</button>
+				</div>
+				<div class="modal-content">
+					<div class="note-preview-content">
+						<div class="note-meta-info">
+							<span class="note-created-date">${this.t('dashy', 'Created')}: ${this.formatDate(this.previewNote.created || this.previewNote.modified)}</span>
+							${this.previewNote.category ? `<span class="note-category-badge">${this.previewNote.category}</span>` : ''}
+						</div>
+						<div class="note-content-display">
+							${this.previewNote.content}
+						</div>
+					</div>
+					<div class="modal-actions">
+						<button type="button" class="btn-cancel">${this.t('dashy', 'Close')}</button>
+						<button type="button" class="btn-save">${this.t('dashy', 'Edit')}</button>
+					</div>
+				</div>
+			`
+		},
+		
+		bindPreviewModalEvents() {
+			if (!this.previewModalElement) return
+			
+			const closeBtn = this.previewModalElement.querySelector('.close-btn')
+			if (closeBtn) {
+				closeBtn.addEventListener('click', (e) => {
+					e.preventDefault()
+					e.stopPropagation()
+					this.closeNotePreview()
+				})
+			}
+			
+			const cancelBtn = this.previewModalElement.querySelector('.btn-cancel')
+			if (cancelBtn) {
+				cancelBtn.addEventListener('click', (e) => {
+					e.preventDefault()
+					this.closeNotePreview()
+				})
+			}
+			
+			const editBtn = this.previewModalElement.querySelector('.btn-save')
+			if (editBtn) {
+				editBtn.addEventListener('click', (e) => {
+					e.preventDefault()
+					this.editPreviewNote()
+				})
+			}
 		},
 	},
 }
@@ -493,24 +703,134 @@ export default {
 		}
 	}
 }
+</style>
 
-.quick-note-content {
+<style lang="scss">
+/* Global modal styles - rendered in document.body */
+.note-editor-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	backdrop-filter: blur(4px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 2100;
 	padding: 20px;
-	
+}
+
+.note-editor-modal {
+	background: var(--color-main-background);
+	border-radius: 12px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+	max-width: 500px;
+	width: 100%;
+	max-height: 90vh;
+	overflow: auto;
+	border: 1px solid var(--color-border);
+}
+
+.note-preview-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	backdrop-filter: blur(4px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 2100;
+	padding: 20px;
+}
+
+.note-preview-modal {
+	background: var(--color-main-background);
+	border-radius: 12px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+	max-width: 500px;
+	width: 100%;
+	max-height: 90vh;
+	overflow: auto;
+	border: 1px solid var(--color-border);
+}
+
+.modal-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 20px 24px;
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-background-dark);
+	border-radius: 12px 12px 0 0;
+
+	h3 {
+		margin: 0;
+		font-size: 18px;
+		font-weight: 600;
+		color: var(--color-main-text);
+	}
+
+	.close-btn {
+		background: none;
+		border: none;
+		font-size: 20px;
+		cursor: pointer;
+		color: var(--color-text-maxcontrast);
+		padding: 8px;
+		border-radius: 6px;
+		transition: all 0.2s ease;
+		min-width: 32px;
+		min-height: 32px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&:hover {
+			background: var(--color-background-hover);
+			color: var(--color-main-text);
+		}
+	}
+}
+
+.modal-content {
+	padding: 24px;
+}
+
+.note-form {
+	margin: 0;
+	padding: 0;
+}
+
+.form-group {
+	margin-bottom: 20px;
+
+	label {
+		display: block;
+		margin-bottom: 8px;
+		font-weight: 500;
+		color: var(--color-main-text);
+		font-size: 14px;
+	}
+
 	.note-title-input {
 		width: 100%;
-		padding: 8px 12px;
+		padding: 12px 16px;
 		border: 1px solid var(--color-border);
-		border-radius: 6px;
+		border-radius: 8px;
 		background-color: var(--color-main-background);
 		color: var(--color-main-text);
 		font-size: 16px;
 		font-weight: 500;
-		margin-bottom: 12px;
 		
 		&:focus {
 			outline: none;
 			border-color: var(--color-primary);
+			box-shadow: 0 0 0 2px var(--color-primary-light);
 		}
 		
 		&::placeholder {
@@ -520,19 +840,21 @@ export default {
 	
 	.note-content-input {
 		width: 100%;
-		padding: 12px;
+		padding: 16px;
 		border: 1px solid var(--color-border);
-		border-radius: 6px;
+		border-radius: 8px;
 		background-color: var(--color-main-background);
 		color: var(--color-main-text);
 		font-family: inherit;
 		font-size: 14px;
-		line-height: 1.5;
+		line-height: 1.6;
 		resize: vertical;
+		min-height: 300px;
 		
 		&:focus {
 			outline: none;
 			border-color: var(--color-primary);
+			box-shadow: 0 0 0 2px var(--color-primary-light);
 		}
 		
 		&::placeholder {
@@ -540,4 +862,88 @@ export default {
 		}
 	}
 }
+
+.form-actions {
+	display: flex;
+	gap: 12px;
+	justify-content: flex-end;
+	margin-top: 0;
+	padding-top: 16px;
+	border-top: 1px solid var(--color-border);
+}
+
+.modal-actions {
+	display: flex;
+	gap: 12px;
+	justify-content: flex-end;
+	margin-top: 20px;
+	padding-top: 16px;
+	border-top: 1px solid var(--color-border);
+}
+
+.btn-cancel, .btn-save {
+	padding: 8px 16px;
+	border: 1px solid var(--color-border);
+	border-radius: 6px;
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	cursor: pointer;
+	font-size: 14px;
+	font-weight: 500;
+	transition: all 0.2s ease;
+
+	&:hover {
+		background: var(--color-background-hover);
+		border-color: var(--color-primary);
+	}
+}
+
+.btn-save {
+	background: var(--color-primary);
+	border-color: var(--color-primary);
+	color: var(--color-primary-text);
+
+	&:hover {
+		background: var(--color-primary-hover);
+		border-color: var(--color-primary-hover);
+	}
+}
+
+/* Note Preview Specific Styles */
+.note-preview-content {
+	.note-meta-info {
+		display: flex;
+		gap: 12px;
+		margin-bottom: 16px;
+		font-size: 14px;
+		
+		.note-created-date {
+			color: var(--color-text-maxcontrast);
+		}
+		
+		.note-category-badge {
+			background-color: var(--color-primary-light);
+			color: var(--color-primary-text);
+			padding: 2px 8px;
+			border-radius: 12px;
+			font-size: 12px;
+			font-weight: 500;
+		}
+	}
+	
+	.note-content-display {
+		background: var(--color-background-dark);
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		padding: 16px;
+		white-space: pre-wrap;
+		font-family: inherit;
+		font-size: 14px;
+		line-height: 1.6;
+		color: var(--color-main-text);
+		max-height: 400px;
+		overflow-y: auto;
+	}
+}
 </style>
+

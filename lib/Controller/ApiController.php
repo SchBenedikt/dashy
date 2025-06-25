@@ -13,12 +13,14 @@ use OCP\IRequest;
 use OCP\IConfig;
 use OCP\IUserSession;
 use OCP\App\IAppManager;
+use OCP\Files\IRootFolder;
 
 class ApiController extends Controller {
 	private IConfig $config;
 	private IDBConnection $db;
 	private IUserSession $userSession;
 	private IAppManager $appManager;
+	private IRootFolder $rootFolder;
 
 	public function __construct(
 		string $appName,
@@ -26,13 +28,15 @@ class ApiController extends Controller {
 		IConfig $config,
 		IDBConnection $db,
 		IUserSession $userSession,
-		IAppManager $appManager
+		IAppManager $appManager,
+		IRootFolder $rootFolder
 	) {
 		parent::__construct($appName, $request);
 		$this->config = $config;
 		$this->db = $db;
 		$this->userSession = $userSession;
 		$this->appManager = $appManager;
+		$this->rootFolder = $rootFolder;
 	}
 
 	private function getUserId(): string {
@@ -690,7 +694,14 @@ class ApiController extends Controller {
 		$folder = $this->request->getParam('folder', '');
 
 		try {
-			// Always use fallback for now to avoid database issues
+			// Try to load real markdown files from the selected folder
+			$realNotes = $this->loadMarkdownFiles($folder);
+			
+			if (!empty($realNotes)) {
+				return new DataResponse(['notes' => $realNotes]);
+			}
+			
+			// Fallback: Use stored simple notes
 			$notesJson = $this->config->getUserValue($userId, 'dashy', 'simple_notes', '[]');
 			$notes = json_decode($notesJson, true) ?: [];
 			
@@ -707,18 +718,18 @@ class ApiController extends Controller {
 					[
 						'id' => '1',
 						'title' => 'Welcome Note',
-						'content' => 'This is a test note from the Dashy Notes widget.',
+						'content' => 'This is a test note from the Dashy Notes widget. To see real markdown files, select a folder that contains .md files.',
 						'modified' => time(),
 						'category' => '',
 						'folder' => $folder,
 					],
 					[
 						'id' => '2',
-						'title' => 'Another Note',
-						'content' => 'This is another test note.',
+						'title' => 'Instructions',
+						'content' => "## How to use real notes\n\n1. Select a folder using the 'Browse...' button in settings\n2. The folder should contain .md (Markdown) files\n3. These files will be displayed as notes",
 						'modified' => time() - 3600,
-						'category' => 'Personal',
-						'folder' => 'Personal',
+						'category' => 'Help',
+						'folder' => $folder,
 					]
 				];
 				
@@ -751,6 +762,104 @@ class ApiController extends Controller {
 	}
 
 	/**
+	 * Load real markdown files from a folder
+	 *
+	 * @param string $folderPath
+	 * @return array
+	 */
+	private function loadMarkdownFiles(string $folderPath): array {
+		try {
+			$user = $this->userSession->getUser();
+			if (!$user) {
+				return [];
+			}
+
+			$userFolder = $this->rootFolder->getUserFolder($user->getUID());
+			
+			// If folder path is empty, use root folder
+			if (empty($folderPath)) {
+				$targetFolder = $userFolder;
+			} else {
+				try {
+					$targetFolder = $userFolder->get($folderPath);
+					if (!$targetFolder instanceof \OCP\Files\Folder) {
+						return [];
+					}
+				} catch (\OCP\Files\NotFoundException $e) {
+					return [];
+				}
+			}
+
+			$notes = [];
+			$files = $targetFolder->getDirectoryListing();
+			
+			foreach ($files as $file) {
+				// Only process .md files
+				if ($file instanceof \OCP\Files\File && 
+					pathinfo($file->getName(), PATHINFO_EXTENSION) === 'md') {
+					
+					try {
+						$content = $file->getContent();
+						$mtime = $file->getMtime();
+						
+						// Extract title from first line if it's a heading, otherwise use filename
+						$title = $this->extractMarkdownTitle($content, $file->getName());
+						
+						$notes[] = [
+							'id' => $file->getId(),
+							'title' => $title,
+							'content' => $content,
+							'modified' => $mtime,
+							'created' => $mtime, // Use mtime as fallback for created time
+							'category' => '', // Could be derived from folder or frontmatter in future
+							'folder' => $folderPath,
+							'path' => $file->getPath(),
+							'size' => $file->getSize(),
+							'isMarkdownFile' => true
+						];
+					} catch (\Exception $e) {
+						error_log('Error reading markdown file ' . $file->getName() . ': ' . $e->getMessage());
+						continue;
+					}
+				}
+			}
+			
+			// Sort by modification time (newest first)
+			usort($notes, function($a, $b) {
+				return $b['modified'] - $a['modified'];
+			});
+			
+			return $notes;
+			
+		} catch (\Exception $e) {
+			error_log('Error loading markdown files from folder ' . $folderPath . ': ' . $e->getMessage());
+			return [];
+		}
+	}
+
+	/**
+	 * Extract title from markdown content
+	 *
+	 * @param string $content
+	 * @param string $filename
+	 * @return string
+	 */
+	private function extractMarkdownTitle(string $content, string $filename): string {
+		$lines = explode("\n", $content);
+		
+		// Look for first heading
+		foreach ($lines as $line) {
+			$line = trim($line);
+			if (preg_match('/^#+\s+(.+)$/', $line, $matches)) {
+				return trim($matches[1]);
+			}
+		}
+		
+		// Fallback: use filename without extension
+		return pathinfo($filename, PATHINFO_FILENAME);
+	}
+
+	/**
 	 * Get available folders for notes storage
 	 *
 	 * @return DataResponse<Http::STATUS_OK, array{folders: array}, array{}>
@@ -766,72 +875,54 @@ class ApiController extends Controller {
 
 		try {
 			$folders = [];
-			
+
 			// Add root folder
 			$folders[] = [
 				'path' => '',
-				'name' => 'Root folder',
-				'type' => 'folder'
+				'name' => 'Default folder',
 			];
 
-			// Try to get real folders from Nextcloud Files
-			try {
+			// Check if Notes app is enabled and get existing categories
+			if ($this->appManager->isEnabledForUser('notes')) {
 				$qb = $this->db->getQueryBuilder();
-				$foldersQuery = $qb->select('f.name', 'f.path')
-					->from('filecache', 'f')
-					->leftJoin('f', 'storages', 's', 'f.storage = s.numeric_id')
-					->where($qb->expr()->like('s.id', $qb->createNamedParameter('home::' . $userId . '%')))
-					->andWhere($qb->expr()->eq('f.mimetype', $qb->createNamedParameter(2))) // Directory mimetype
-					->andWhere($qb->expr()->neq('f.name', $qb->createNamedParameter('.')))
-					->andWhere($qb->expr()->neq('f.name', $qb->createNamedParameter('..')))
-					->andWhere($qb->expr()->notLike('f.name', $qb->createNamedParameter('.%'))) // Skip hidden folders
-					->orderBy('f.path', 'ASC')
-					->setMaxResults(100);
+				$categoriesQuery = $qb->selectDistinct('category')
+					->from('notes_notes')
+					->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+					->andWhere($qb->expr()->neq('category', $qb->createNamedParameter('')))
+					->orderBy('category', 'ASC');
 
-				$foldersResult = $foldersQuery->executeQuery();
+				$categoriesResult = $categoriesQuery->executeQuery();
 				
-				while ($folder = $foldersResult->fetch()) {
-					// Clean up the path - remove /files/ prefix and user directory
-					$cleanPath = $folder['path'];
-					$cleanPath = preg_replace('#^/?files/?#', '', $cleanPath);
-					$cleanPath = preg_replace('#^' . preg_quote($userId) . '/?files/?#', '', $cleanPath);
-					$cleanPath = ltrim($cleanPath, '/');
-					
-					if (!empty($cleanPath) && !empty($folder['name'])) {
+				while ($row = $categoriesResult->fetch()) {
+					$category = $row['category'];
+					if (!empty($category)) {
 						$folders[] = [
-							'path' => $cleanPath,
-							'name' => $folder['name'],
-							'type' => 'folder'
+							'path' => $category,
+							'name' => $category,
 						];
 					}
 				}
-				$foldersResult->closeCursor();
-				
-			} catch (\Exception $e) {
-				error_log('Failed to fetch real folders: ' . $e->getMessage());
+				$categoriesResult->closeCursor();
 			}
 
-			// If no real folders found, add some common suggestions
+			// Add some common folder suggestions if no categories exist yet
 			if (count($folders) === 1) {
-				$folders[] = ['path' => 'Notes', 'name' => 'Notes', 'type' => 'suggestion'];
-				$folders[] = ['path' => 'Documents', 'name' => 'Documents', 'type' => 'suggestion'];
-				$folders[] = ['path' => 'Documents/Notes', 'name' => 'Documents/Notes', 'type' => 'suggestion'];
-				$folders[] = ['path' => 'Personal', 'name' => 'Personal', 'type' => 'suggestion'];
-				$folders[] = ['path' => 'Work', 'name' => 'Work', 'type' => 'suggestion'];
+				$folders[] = ['path' => 'Notes', 'name' => 'Notes'];
+				$folders[] = ['path' => 'Personal', 'name' => 'Personal'];
+				$folders[] = ['path' => 'Work', 'name' => 'Work'];
+				$folders[] = ['path' => 'Ideas', 'name' => 'Ideas'];
 			}
 
 			return new DataResponse(['folders' => $folders]);
 			
 		} catch (\Exception $e) {
-			error_log('Dashy getNotesFolders error: ' . $e->getMessage());
-			
 			// Fallback to common folder names
 			$folders = [
-				['path' => '', 'name' => 'Root folder', 'type' => 'folder'],
-				['path' => 'Notes', 'name' => 'Notes', 'type' => 'suggestion'],
-				['path' => 'Documents', 'name' => 'Documents', 'type' => 'suggestion'],
-				['path' => 'Personal', 'name' => 'Personal', 'type' => 'suggestion'],
-				['path' => 'Work', 'name' => 'Work', 'type' => 'suggestion'],
+				['path' => '', 'name' => 'Default folder'],
+				['path' => 'Notes', 'name' => 'Notes'],
+				['path' => 'Personal', 'name' => 'Personal'],
+				['path' => 'Work', 'name' => 'Work'],
+				['path' => 'Ideas', 'name' => 'Ideas'],
 			];
 
 			return new DataResponse(['folders' => $folders]);
@@ -857,6 +948,25 @@ class ApiController extends Controller {
 		$folder = $this->request->getParam('folder', '');
 
 		try {
+			// Try to create real markdown file first
+			$markdownFile = $this->createMarkdownFile($title, $content, $folder);
+			
+			if ($markdownFile) {
+				$noteData = [
+					'id' => $markdownFile['id'],
+					'title' => $markdownFile['title'],
+					'content' => $markdownFile['content'],
+					'modified' => $markdownFile['modified'],
+					'category' => $folder,
+					'folder' => $folder,
+					'path' => $markdownFile['path'],
+					'isMarkdownFile' => true
+				];
+				
+				return new DataResponse(['success' => true, 'note' => $noteData]);
+			}
+			
+			// Fallback: create simple note
 			$noteData = [
 				'id' => uniqid(),
 				'title' => $title ?: 'Untitled',
@@ -913,6 +1023,14 @@ class ApiController extends Controller {
 		}
 
 		try {
+			// Try to update real markdown file first
+			$updatedFile = $this->updateMarkdownFile($noteId, $title, $content);
+			
+			if ($updatedFile) {
+				return new DataResponse(['success' => true, 'note' => $updatedFile]);
+			}
+			
+			// Fallback: update in database or app config
 			$noteData = [
 				'id' => $noteId,
 				'title' => $title ?: 'Untitled',
@@ -952,6 +1070,64 @@ class ApiController extends Controller {
 			
 		} catch (\Exception $e) {
 			return new DataResponse(['success' => false], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Update a real markdown file
+	 *
+	 * @param string $noteId
+	 * @param string $title
+	 * @param string $content
+	 * @return array|null
+	 */
+	private function updateMarkdownFile(string $noteId, string $title, string $content): ?array {
+		try {
+			$user = $this->userSession->getUser();
+			if (!$user) {
+				return null;
+			}
+
+			$userFolder = $this->rootFolder->getUserFolder($user->getUID());
+			
+			// Try to find the file by ID
+			try {
+				$files = $userFolder->getById($noteId);
+				if (empty($files)) {
+					return null;
+				}
+				
+				$file = $files[0];
+				if (!$file instanceof \OCP\Files\File || 
+					pathinfo($file->getName(), PATHINFO_EXTENSION) !== 'md') {
+					return null;
+				}
+				
+				// Create markdown content with title as heading if not already present
+				$markdownContent = $content;
+				if (!empty($title) && !preg_match('/^#+\s+/', trim($content))) {
+					$markdownContent = "# " . $title . "\n\n" . $content;
+				}
+				
+				// Update the file content
+				$file->putContent($markdownContent);
+				
+				return [
+					'id' => $file->getId(),
+					'title' => $title ?: pathinfo($file->getName(), PATHINFO_FILENAME),
+					'content' => $markdownContent,
+					'modified' => $file->getMtime(),
+					'path' => $file->getPath(),
+					'isMarkdownFile' => true
+				];
+				
+			} catch (\OCP\Files\NotFoundException $e) {
+				return null;
+			}
+			
+		} catch (\Exception $e) {
+			error_log('Error updating markdown file: ' . $e->getMessage());
+			return null;
 		}
 	}
 
@@ -1161,83 +1337,168 @@ class ApiController extends Controller {
 	}
 
 	/**
-	 * Browse folders in a specific directory
+	 * Get folders for folder browser
 	 *
-	 * @param string $path The path to browse
-	 * @return DataResponse<Http::STATUS_OK, array{folders: array, currentPath: string, parentPath: string|null}, array{}>
+	 * @param string $path Optional path to browse
+	 * @return DataResponse<Http::STATUS_OK, array{folders: array}, array{}>
 	 *
-	 * 200: Folder contents returned
+	 * 200: Folders returned
 	 */
 	#[NoAdminRequired]
-	public function browseFolders(string $path = ''): DataResponse {
-		$userId = $this->getUserId();
-		if (empty($userId)) {
-			return new DataResponse(['folders' => [], 'currentPath' => '', 'parentPath' => null]);
+	public function getFolders(string $path = ''): DataResponse {
+		$user = $this->userSession->getUser();
+		if (!$user) {
+			return new DataResponse(['error' => 'User not found'], 401);
 		}
+		$userId = $user->getUID();
 
 		try {
 			$folders = [];
-			$cleanPath = trim($path, '/');
 			
-			// Determine parent path
-			$parentPath = null;
-			if (!empty($cleanPath)) {
-				$pathParts = explode('/', $cleanPath);
-				array_pop($pathParts);
-				$parentPath = implode('/', $pathParts);
-			}
-
-			// Query for subfolders in the current path
-			$qb = $this->db->getQueryBuilder();
-			$searchPath = empty($cleanPath) ? 'files' : 'files/' . $cleanPath;
+			// Get user's root folder
+			$userFolder = $this->rootFolder->getUserFolder($userId);
 			
-			$foldersQuery = $qb->select('f.name', 'f.path')
-				->from('filecache', 'f')
-				->leftJoin('f', 'storages', 's', 'f.storage = s.numeric_id')
-				->where($qb->expr()->like('s.id', $qb->createNamedParameter('home::' . $userId . '%')))
-				->andWhere($qb->expr()->eq('f.mimetype', $qb->createNamedParameter(2))) // Directory mimetype
-				->andWhere($qb->expr()->like('f.path', $qb->createNamedParameter($searchPath . '/%')))
-				->andWhere($qb->expr()->neq('f.name', $qb->createNamedParameter('.')))
-				->andWhere($qb->expr()->neq('f.name', $qb->createNamedParameter('..')))
-				->andWhere($qb->expr()->notLike('f.name', $qb->createNamedParameter('.%'))) // Skip hidden folders
-				->orderBy('f.name', 'ASC')
-				->setMaxResults(50);
-
-			$foldersResult = $foldersQuery->executeQuery();
-			
-			while ($folder = $foldersResult->fetch()) {
-				// Extract just the folder name (not full path)
-				$folderName = $folder['name'];
-				$folderPath = empty($cleanPath) ? $folderName : $cleanPath . '/' . $folderName;
-				
-				// Skip if this is not a direct child
-				$relativePath = preg_replace('#^' . preg_quote($searchPath . '/') . '#', '', $folder['path']);
-				if (strpos($relativePath, '/') !== false) {
-					continue; // This is a deeper subfolder
+			// Navigate to the requested path
+			$currentFolder = $userFolder;
+			if (!empty($path)) {
+				try {
+					$currentFolder = $userFolder->get($path);
+					if (!$currentFolder instanceof \OCP\Files\Folder) {
+						return new DataResponse(['folders' => []]);
+					}
+				} catch (\OCP\Files\NotFoundException $e) {
+					return new DataResponse(['folders' => []]);
 				}
-				
-				$folders[] = [
-					'path' => $folderPath,
-					'name' => $folderName,
-					'type' => 'folder'
-				];
 			}
-			$foldersResult->closeCursor();
-
-			return new DataResponse([
-				'folders' => $folders,
-				'currentPath' => $cleanPath,
-				'parentPath' => $parentPath
-			]);
+			
+			// Get all items in the current folder
+			$nodes = $currentFolder->getDirectoryListing();
+			
+			foreach ($nodes as $node) {
+				// Only include folders/directories
+				if ($node instanceof \OCP\Files\Folder) {
+					$relativePath = $userFolder->getRelativePath($node->getPath());
+					if ($relativePath === null) {
+						continue;
+					}
+					
+					// Remove leading slash if present
+					$relativePath = ltrim($relativePath, '/');
+					
+					$folders[] = [
+						'path' => $relativePath,
+						'name' => $node->getName(),
+						'relativePath' => $relativePath ? dirname($relativePath) : '',
+						'id' => $node->getId(),
+						'mtime' => $node->getMTime(),
+						'permissions' => $node->getPermissions(),
+					];
+				}
+			}
+			
+			// Sort folders by name
+			usort($folders, function($a, $b) {
+				return strcasecmp($a['name'], $b['name']);
+			});
+			
+			return new DataResponse(['folders' => $folders]);
 			
 		} catch (\Exception $e) {
-			error_log('Dashy browseFolders error: ' . $e->getMessage());
-			return new DataResponse([
-				'folders' => [],
-				'currentPath' => $path,
-				'parentPath' => null,
-				'error' => 'Failed to browse folders'
-			]);
+			error_log('Dashy getFolders error: ' . $e->getMessage());
+			error_log('Dashy getFolders trace: ' . $e->getTraceAsString());
+			
+			// Return empty folders on error
+			return new DataResponse(['folders' => [], 'error' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
+	}
+
+	/**
+	 * Create a real markdown file in the specified folder
+	 *
+	 * @param string $title
+	 * @param string $content
+	 * @param string $folderPath
+	 * @return array|null
+	 */
+	private function createMarkdownFile(string $title, string $content, string $folderPath): ?array {
+		try {
+			$user = $this->userSession->getUser();
+			if (!$user) {
+				return null;
+			}
+
+			$userFolder = $this->rootFolder->getUserFolder($user->getUID());
+			
+			// If folder path is empty, use root folder
+			if (empty($folderPath)) {
+				$targetFolder = $userFolder;
+			} else {
+				try {
+					$targetFolder = $userFolder->get($folderPath);
+					if (!$targetFolder instanceof \OCP\Files\Folder) {
+						// Create folder if it doesn't exist
+						$targetFolder = $userFolder->newFolder($folderPath);
+					}
+				} catch (\OCP\Files\NotFoundException $e) {
+					// Create folder if it doesn't exist
+					$targetFolder = $userFolder->newFolder($folderPath);
+				}
+			}
+
+			// Create filename from title
+			$filename = $this->createSafeFilename($title ?: 'Untitled') . '.md';
+			
+			// Ensure unique filename
+			$counter = 1;
+			$originalFilename = $filename;
+			while ($targetFolder->nodeExists($filename)) {
+				$baseName = pathinfo($originalFilename, PATHINFO_FILENAME);
+				$filename = $baseName . '_' . $counter . '.md';
+				$counter++;
+			}
+
+			// Create markdown content with title as heading if not already present
+			$markdownContent = $content;
+			if (!empty($title) && !preg_match('/^#+\s+/', trim($content))) {
+				$markdownContent = "# " . $title . "\n\n" . $content;
+			}
+
+			// Create the file
+			$file = $targetFolder->newFile($filename);
+			$file->putContent($markdownContent);
+
+			return [
+				'id' => $file->getId(),
+				'title' => $title ?: pathinfo($filename, PATHINFO_FILENAME),
+				'content' => $markdownContent,
+				'modified' => $file->getMtime(),
+				'path' => $file->getPath(),
+				'filename' => $filename
+			];
+			
+		} catch (\Exception $e) {
+			error_log('Error creating markdown file: ' . $e->getMessage());
+			return null;
+		}
+	}
+
+	/**
+	 * Create a safe filename from title
+	 *
+	 * @param string $title
+	 * @return string
+	 */
+	private function createSafeFilename(string $title): string {
+		// Remove or replace invalid characters
+		$filename = preg_replace('/[^\w\s\-_\.]/', '', $title);
+		$filename = preg_replace('/[\s]+/', '_', $filename);
+		$filename = trim($filename, '_');
+		
+		// Ensure it's not empty
+		if (empty($filename)) {
+			$filename = 'note_' . date('Y-m-d_H-i-s');
+		}
+		
+		return $filename;
 	}
 }
