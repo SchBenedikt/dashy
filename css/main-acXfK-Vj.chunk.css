@@ -1,0 +1,172 @@
+#dashy[data-v-8aaec168] {
+  padding: 20px;
+  height: 100vh;
+  overflow: auto;
+}
+.dashboard-header[data-v-8aaec168] {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.dashboard-header h1[data-v-8aaec168] {
+  margin: 0;
+}
+.dashboard-container[data-v-8aaec168] {
+  min-height: calc(100vh - 120px);
+}
+
+/* Add Widget Modal Overlay */
+.add-widget-overlay[data-v-8aaec168] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2100;
+  padding: 20px;
+}
+.add-widget-modal[data-v-8aaec168] {
+  background: var(--color-main-background);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+}
+.modal-header[data-v-8aaec168] {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-background-dark);
+  border-radius: 12px 12px 0 0;
+}
+.modal-header h3[data-v-8aaec168] {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-main-text);
+}
+.modal-header .close-btn[data-v-8aaec168] {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--color-text-maxcontrast);
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-header .close-btn[data-v-8aaec168]:hover {
+  background: var(--color-background-hover);
+  color: var(--color-main-text);
+}
+.modal-content[data-v-8aaec168] {
+  padding: 24px;
+}
+.widget-types[data-v-8aaec168] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+.widget-type-card[data-v-8aaec168] {
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.widget-type-card[data-v-8aaec168]:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-background-hover);
+}
+.widget-type-card h3[data-v-8aaec168] {
+  margin: 10px 0 5px 0;
+}
+.widget-type-card p[data-v-8aaec168] {
+  margin: 0;
+  color: var(--color-text-lighter);
+  font-size: 14px;
+}
+[data-v-8aaec168] .vue-grid-layout {
+  background-color: transparent;
+}
+[data-v-8aaec168] .vue-grid-item {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-main-background);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+[data-v-8aaec168] .vue-grid-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+[data-v-8aaec168] .vue-grid-item.vue-grid-item--resizing {
+  opacity: 0.8;
+}
+[data-v-8aaec168] .vue-grid-item.vue-grid-item--dragging {
+  transition: none;
+  z-index: 3;
+}
+[data-v-8aaec168] .vue-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  background: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNiIgaGVpZ2h0PSI2IiB2aWV3Qm94PSIwIDAgNiA2IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8ZG90cyBmaWxsPSIjODg4IiBkPSJtMTUgMTJBMyAzIDAgMSAxIDkgNmEzIDMgMCAwIDEgNiA2eiIvPgo8L3N2Zz4K");
+  background-position: bottom right;
+  padding: 0 3px 3px 0;
+  background-repeat: no-repeat;
+  background-origin: content-box;
+  box-sizing: border-box;
+  cursor: se-resize;
+}
+
+/* Landing Page Styles */
+.dashboard-landing[data-v-8aaec168] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 70vh;
+  background: var(--color-background-hover);
+  border-radius: 12px;
+  margin-top: 32px;
+}
+.landing-content[data-v-8aaec168] {
+  text-align: center;
+  padding: 48px 32px;
+  max-width: 420px;
+  margin: 0 auto;
+}
+.landing-logo[data-v-8aaec168] {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 20px;
+}
+.landing-actions[data-v-8aaec168] {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin: 24px 0 12px 0;
+}
+.landing-info[data-v-8aaec168] {
+  color: var(--color-text-lighter);
+  font-size: 15px;
+  margin-top: 12px;
+}

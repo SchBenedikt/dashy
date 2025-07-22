@@ -3,41 +3,56 @@
 		<!-- Widget Header with Actions -->
 		<div v-if="displayMode !== 'compact'" class="widget-header">
 			<div class="header-actions">
-				<button 
-					class="add-task-btn" 
+				<NcButton
+					type="primary"
+					:aria-label="t('dashy', 'Add new task')"
 					@click="addNewTask"
 					:title="t('dashy', 'Add new task')"
 				>
-					➕
-				</button>
-				<button 
-					class="refresh-btn" 
+					<template #icon>
+						<svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/>
+						</svg>
+					</template>
+					{{ t('dashy', 'Add Task') }}
+				</NcButton>
+				<NcButton
+					type="tertiary"
+					:aria-label="t('dashy', 'Refresh tasks')"
 					@click="loadTasks"
-					:title="t('dashy', 'Refresh tasks')"
 					:disabled="loading"
+					:title="t('dashy', 'Refresh tasks')"
 				>
-					🔄
-				</button>
+					<template #icon>
+						<svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16" :class="{ spinning: loading }">
+							<path fill="currentColor" d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"/>
+						</svg>
+					</template>
+					{{ t('dashy', 'Refresh') }}
+				</NcButton>
 			</div>
 			<div v-if="displayMode === 'detailed'" class="filter-tabs">
-				<button 
-					:class="{ active: currentFilter === 'all' }" 
+				<NcButton 
+					type="tertiary"
+					:class="{ active: currentFilter === 'all' }"
 					@click="currentFilter = 'all'"
 				>
 					{{ t('dashy', 'All') }} ({{ tasks.length }})
-				</button>
-				<button 
-					:class="{ active: currentFilter === 'active' }" 
+				</NcButton>
+				<NcButton 
+					type="tertiary"
+					:class="{ active: currentFilter === 'active' }"
 					@click="currentFilter = 'active'"
 				>
 					{{ t('dashy', 'Active') }} ({{ todoTasks.length }})
-				</button>
-				<button 
-					:class="{ active: currentFilter === 'completed' }" 
+				</NcButton>
+				<NcButton 
+					type="tertiary"
+					:class="{ active: currentFilter === 'completed' }"
 					@click="currentFilter = 'completed'"
 				>
 					{{ t('dashy', 'Done') }} ({{ completedTasks.length }})
-				</button>
+				</NcButton>
 			</div>
 		</div>
 
@@ -49,10 +64,14 @@
 			<div class="no-tasks-text">{{ t('dashy', 'No tasks found') }}</div>
 			<button 
 				v-if="displayMode !== 'compact'" 
-				class="add-first-task-btn" 
+				class="custom-primary-btn add-first-task-btn"
+				:aria-label="t('dashy', 'Add your first task')"
 				@click="addNewTask"
 			>
-				{{ t('dashy', 'Add your first task') }}
+				<svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16">
+					<path fill="currentColor" d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/>
+				</svg>
+				<span class="btn-text">{{ t('dashy', 'Add your first task') }}</span>
 			</button>
 		</div>
 		
@@ -60,19 +79,28 @@
 		<div v-else-if="displayMode === 'compact'" class="tasks-compact">
 			<div class="compact-header">
 				<button 
-					class="compact-add-btn" 
+					class="custom-compact-btn add-task-compact-btn"
+					:aria-label="t('dashy', 'Add task')"
 					@click="addNewTask"
-					:title="t('dashy', 'Add task')"
+					:title="t('dashy', 'Add new task')"
 				>
-					➕
+					<svg class="compact-icon" viewBox="0 0 24 24" width="12" height="12">
+						<path fill="currentColor" d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/>
+					</svg>
 				</button>
 				<div class="compact-filter">
-					<button 
-						:class="{ active: currentFilter === 'active' }" 
+					<NcButton 
+						type="tertiary"
+						:aria-label="currentFilter === 'active' ? t('dashy', 'Show completed') : t('dashy', 'Show active')"
 						@click="toggleCompactFilter"
+						:class="{ active: currentFilter === 'active' }"
+						class="compact-btn"
 					>
-						{{ currentFilter === 'active' ? '📋' : '✅' }}
-					</button>
+						<template #icon>
+							<CheckboxMarkedCircleIcon v-if="currentFilter === 'active'" :size="14" />
+							<CheckboxBlankCircleOutlineIcon v-else :size="14" />
+						</template>
+					</NcButton>
 				</div>
 			</div>
 			<div
@@ -131,13 +159,15 @@
 					<div v-if="task.priority && task.priority >= 6" class="task-priority">
 						{{ getPriorityIcon(task.priority) }}
 					</div>
-					<button 
-						class="edit-task-btn" 
+					<NcButton 
+						type="tertiary"
+						:aria-label="t('dashy', 'Edit task')"
 						@click="editTask(task)"
-						:title="t('dashy', 'Edit task')"
 					>
-						✏️
-					</button>
+						<template #icon>
+							<PencilIcon :size="16" />
+						</template>
+					</NcButton>
 				</div>
 			</div>
 		</div>
@@ -166,13 +196,16 @@
 							{{ getPriorityIcon(task.priority) }} {{ getPriorityText(task.priority) }}
 						</div>
 					</div>
-					<button 
-						class="edit-task-btn-detailed" 
+					<NcButton 
+						type="tertiary"
+						:aria-label="t('dashy', 'Edit task')"
 						@click="editTask(task)"
-						:title="t('dashy', 'Edit task')"
+						class="task-edit-btn-detailed"
 					>
-						✏️
-					</button>
+						<template #icon>
+							<PencilIcon :size="16" />
+						</template>
+					</NcButton>
 				</div>
 				<div class="task-content" @click="editTask(task)">
 					<div class="task-title-detailed">{{ task.summary }}</div>
@@ -193,9 +226,19 @@
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { translate as t } from '@nextcloud/l10n'
+import NcButton from '@nextcloud/vue/dist/Components/NcButton.js'
+import PencilIcon from 'vue-material-design-icons/Pencil.vue'
+import CheckboxMarkedCircleIcon from 'vue-material-design-icons/CheckboxMarkedCircle.vue'
+import CheckboxBlankCircleOutlineIcon from 'vue-material-design-icons/CheckboxBlankCircleOutline.vue'
 
 export default {
 	name: 'TodoWidget',
+	components: {
+		NcButton,
+		PencilIcon,
+		CheckboxMarkedCircleIcon,
+		CheckboxBlankCircleOutlineIcon,
+	},
 	props: {
 		widget: {
 			type: Object,
@@ -607,31 +650,35 @@ export default {
 			
 			return `
 				<div class="modal-header">
-					<h3>${editingTask ? t('dashy', 'Edit Task') : t('dashy', 'New Task')}</h3>
-					<button class="close-btn" type="button" title="Close">✕</button>
+					<h3>${editingTask ? this.t('dashy', 'Edit Task') : this.t('dashy', 'New Task')}</h3>
+					<button class="close-btn" type="button" title="${this.t('dashy', 'Close')}">
+						<svg viewBox="0 0 24 24" width="18" height="18">
+							<path fill="currentColor" d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
+						</svg>
+					</button>
 				</div>
-				<form class="task-form" data-action="submit">
+				<form class="task-form">
 					<div class="form-group">
-						<label for="task-title">${t('dashy', 'Title')}</label>
+						<label for="task-title">${this.t('dashy', 'Title')}</label>
 						<input
 							id="task-title"
 							type="text"
-							placeholder="${t('dashy', 'Enter task title...')}"
+							placeholder="${this.t('dashy', 'Enter task title...')}"
 							required
-							value="${taskForm.summary}"
+							value="${this.escapeHtml(taskForm.summary)}"
 						>
 					</div>
 					<div class="form-group">
-						<label for="task-description">${t('dashy', 'Description')}</label>
+						<label for="task-description">${this.t('dashy', 'Description')}</label>
 						<textarea
 							id="task-description"
-							placeholder="${t('dashy', 'Add a description...')}"
+							placeholder="${this.t('dashy', 'Add a description...')}"
 							rows="3"
-						>${taskForm.description}</textarea>
+						>${this.escapeHtml(taskForm.description)}</textarea>
 					</div>
 					<div class="form-row">
 						<div class="form-group">
-							<label for="task-due">${t('dashy', 'Due Date')}</label>
+							<label for="task-due">${this.t('dashy', 'Due Date')}</label>
 							<input
 								id="task-due"
 								type="datetime-local"
@@ -639,31 +686,35 @@ export default {
 							>
 						</div>
 						<div class="form-group">
-							<label for="task-priority">${t('dashy', 'Priority')}</label>
+							<label for="task-priority">${this.t('dashy', 'Priority')}</label>
 							<select id="task-priority">
-								<option value="0" ${taskForm.priority == 0 ? 'selected' : ''}>${t('dashy', 'None')}</option>
-								<option value="3" ${taskForm.priority == 3 ? 'selected' : ''}>${t('dashy', 'Low')}</option>
-								<option value="5" ${taskForm.priority == 5 ? 'selected' : ''}>${t('dashy', 'Medium')}</option>
-								<option value="7" ${taskForm.priority == 7 ? 'selected' : ''}>${t('dashy', 'High')}</option>
-								<option value="9" ${taskForm.priority == 9 ? 'selected' : ''}>${t('dashy', 'Urgent')}</option>
+								<option value="0" ${taskForm.priority == 0 ? 'selected' : ''}>${this.t('dashy', 'None')}</option>
+								<option value="3" ${taskForm.priority == 3 ? 'selected' : ''}>${this.t('dashy', 'Low')}</option>
+								<option value="5" ${taskForm.priority == 5 ? 'selected' : ''}>${this.t('dashy', 'Medium')}</option>
+								<option value="7" ${taskForm.priority == 7 ? 'selected' : ''}>${this.t('dashy', 'High')}</option>
+								<option value="9" ${taskForm.priority == 9 ? 'selected' : ''}>${this.t('dashy', 'Urgent')}</option>
 							</select>
 						</div>
 					</div>
 					<div class="form-actions">
-						<button type="button" data-action="cancel" class="btn-cancel">
-							${t('dashy', 'Cancel')}
+						<button type="button" class="btn-cancel">
+							<svg viewBox="0 0 24 24" width="16" height="16">
+								<path fill="currentColor" d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
+							</svg>
+							${this.t('dashy', 'Cancel')}
 						</button>
 						${editingTask ? `
-						<button 
-							type="button" 
-							data-action="delete"
-							class="btn-delete"
-							${saving ? 'disabled' : ''}
-						>
-							${t('dashy', 'Delete')}
+						<button type="button" class="btn-delete" ${saving ? 'disabled' : ''}>
+							<svg viewBox="0 0 24 24" width="16" height="16">
+								<path fill="currentColor" d="M9,3V4H4V6H5V19A2,2 0 0,0 7,21H17A2,2 0 0,0 19,19V6H20V4H15V3H9M7,6H17V19H7V6M9,8V17H11V8H9M13,8V17H15V8H13Z"/>
+							</svg>
+							${this.t('dashy', 'Delete')}
 						</button>` : ''}
-						<button type="submit" class="btn-save" ${saving || !taskForm.summary.trim() ? 'disabled' : ''}>
-							${saving ? t('dashy', 'Saving...') : (editingTask ? t('dashy', 'Update') : t('dashy', 'Create'))}
+						<button type="submit" class="btn-save" ${saving || !taskForm.summary.trim() ? 'disabled' : ''} id="save-btn">
+							<svg viewBox="0 0 24 24" width="16" height="16">
+								<path fill="currentColor" d="M15,9H5V5H15M12,19A3,3 0 0,1 9,16A3,3 0 0,1 12,13A3,3 0 0,1 15,16A3,3 0 0,1 12,19M17,3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V7L17,3Z"/>
+							</svg>
+							${saving ? this.t('dashy', 'Saving...') : (editingTask ? this.t('dashy', 'Update') : this.t('dashy', 'Create'))}
 						</button>
 					</div>
 				</form>
@@ -675,60 +726,94 @@ export default {
 			
 			// Form submission
 			const form = this.modalElement.querySelector('.task-form')
-			form.addEventListener('submit', (e) => {
-				e.preventDefault()
-				this.saveTaskFromModal()
-			})
+			if (form) {
+				form.addEventListener('submit', (e) => {
+					e.preventDefault()
+					this.saveTaskFromModal()
+				})
+			}
 			
-			// Direct event listener for close button
+			// Close button
 			const closeBtn = this.modalElement.querySelector('.close-btn')
 			if (closeBtn) {
 				closeBtn.addEventListener('click', (e) => {
 					e.preventDefault()
 					e.stopPropagation()
-					console.log('Close button clicked!')
 					this.closeTaskEditor()
 				})
 			}
 			
-			// Button clicks - use event delegation for other buttons
-			this.modalElement.addEventListener('click', (e) => {
-				const action = e.target.getAttribute('data-action')
-				
-				console.log('Modal click event:', e.target, 'action:', action)
-				
-				switch (action) {
-					case 'cancel':
-						e.preventDefault()
-						e.stopPropagation()
-						this.closeTaskEditor()
-						break
-					case 'delete':
-						e.preventDefault()
-						e.stopPropagation()
-						this.deleteTask()
-						break
-				}
-			})
+			// Cancel button
+			const cancelBtn = this.modalElement.querySelector('.btn-cancel')
+			if (cancelBtn) {
+				cancelBtn.addEventListener('click', (e) => {
+					e.preventDefault()
+					e.stopPropagation()
+					this.closeTaskEditor()
+				})
+			}
 			
-			// Input changes
+			// Delete button
+			const deleteBtn = this.modalElement.querySelector('.btn-delete')
+			if (deleteBtn) {
+				deleteBtn.addEventListener('click', (e) => {
+					e.preventDefault()
+					e.stopPropagation()
+					if (confirm(this.t('dashy', 'Are you sure you want to delete this task?'))) {
+						this.deleteTask()
+					}
+				})
+			}
+			
+			// Input changes with real-time validation
 			const titleInput = this.modalElement.querySelector('#task-title')
 			const descInput = this.modalElement.querySelector('#task-description')
 			const dueInput = this.modalElement.querySelector('#task-due')
 			const priorityInput = this.modalElement.querySelector('#task-priority')
 			
-			titleInput?.addEventListener('input', (e) => {
-				this.taskForm.summary = e.target.value
-			})
-			descInput?.addEventListener('input', (e) => {
-				this.taskForm.description = e.target.value
-			})
-			dueInput?.addEventListener('input', (e) => {
-				this.taskForm.due = e.target.value
-			})
-			priorityInput?.addEventListener('change', (e) => {
-				this.taskForm.priority = parseInt(e.target.value)
-			})
+			if (titleInput) {
+				titleInput.addEventListener('input', (e) => {
+					this.taskForm.summary = e.target.value
+					this.updateSaveButton()
+				})
+			}
+			
+			if (descInput) {
+				descInput.addEventListener('input', (e) => {
+					this.taskForm.description = e.target.value
+				})
+			}
+			
+			if (dueInput) {
+				dueInput.addEventListener('input', (e) => {
+					this.taskForm.due = e.target.value
+				})
+			}
+			
+			if (priorityInput) {
+				priorityInput.addEventListener('change', (e) => {
+					this.taskForm.priority = parseInt(e.target.value)
+				})
+			}
+		},
+		
+		// Helper method to escape HTML in form values
+		escapeHtml(text) {
+			if (!text) return ''
+			const div = document.createElement('div')
+			div.textContent = text
+			return div.innerHTML
+		},
+		
+		// Update save button state
+		updateSaveButton() {
+			if (!this.modalElement) return
+			
+			const saveBtn = this.modalElement.querySelector('#save-btn')
+			if (saveBtn) {
+				const hasTitle = this.taskForm.summary.trim().length > 0
+				saveBtn.disabled = this.saving || !hasTitle
+			}
 		},
 		
 		async saveTaskFromModal() {
@@ -772,26 +857,161 @@ export default {
 	gap: 8px;
 }
 
-.add-task-btn,
-.refresh-btn {
-	background: var(--color-primary);
+// Custom Action Buttons
+.custom-action-btn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 12px;
 	border: none;
-	border-radius: 6px;
-	color: white;
-	padding: 6px 8px;
+	border-radius: 8px;
+	background: var(--color-background-hover);
+	color: var(--color-text-dark);
 	cursor: pointer;
-	font-size: 12px;
+	font-size: 13px;
+	font-weight: 500;
 	transition: all 0.2s ease;
+	border: 1px solid var(--color-border);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 
 	&:hover {
-		background: var(--color-primary-hover);
-		transform: scale(1.05);
+		background: var(--color-background-dark);
+		border-color: var(--color-primary);
+		transform: translateY(-1px);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	}
+
+	&:active {
+		transform: translateY(0);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 	}
 
 	&:disabled {
-		opacity: 0.5;
+		opacity: 0.6;
 		cursor: not-allowed;
 		transform: none;
+		
+		&:hover {
+			background: var(--color-background-hover);
+			border-color: var(--color-border);
+			box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+		}
+	}
+
+	.btn-icon {
+		flex-shrink: 0;
+		transition: transform 0.2s ease;
+
+		&.spinning {
+			animation: spin 1s linear infinite;
+		}
+	}
+
+	.btn-text {
+		font-weight: 500;
+		white-space: nowrap;
+	}
+
+	&:hover .btn-icon {
+		transform: scale(1.1);
+	}
+}
+
+.add-task-btn {
+	&:hover {
+		background: var(--color-success-light);
+		border-color: var(--color-success);
+		color: var(--color-success-text);
+	}
+}
+
+.refresh-btn {
+	&:hover {
+		background: var(--color-primary-light);
+		border-color: var(--color-primary);
+		color: var(--color-primary-text);
+	}
+}
+
+// Custom Primary Button
+.custom-primary-btn {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 20px;
+	border: none;
+	border-radius: 8px;
+	background: var(--color-primary);
+	color: var(--color-primary-text);
+	cursor: pointer;
+	font-size: 14px;
+	font-weight: 600;
+	transition: all 0.2s ease;
+	box-shadow: 0 2px 6px rgba(var(--color-primary-rgb), 0.3);
+
+	&:hover {
+		background: var(--color-primary-hover);
+		transform: translateY(-1px);
+		box-shadow: 0 4px 12px rgba(var(--color-primary-rgb), 0.4);
+	}
+
+	&:active {
+		transform: translateY(0);
+		box-shadow: 0 2px 6px rgba(var(--color-primary-rgb), 0.3);
+	}
+
+	.btn-icon {
+		flex-shrink: 0;
+		transition: transform 0.2s ease;
+	}
+
+	&:hover .btn-icon {
+		transform: scale(1.1) rotate(90deg);
+	}
+}
+
+// Custom Compact Buttons
+.custom-compact-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 4px;
+	border: none;
+	border-radius: 4px;
+	background: var(--color-primary);
+	color: white;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	min-width: 24px;
+	min-height: 24px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+
+	&:hover {
+		background: var(--color-primary-hover);
+		transform: scale(1.1);
+		box-shadow: 0 2px 6px rgba(var(--color-primary-rgb), 0.4);
+	}
+
+	&:active {
+		transform: scale(1.05);
+	}
+
+	.compact-icon {
+		transition: transform 0.2s ease;
+	}
+
+	&:hover .compact-icon {
+		transform: rotate(90deg);
+	}
+}
+
+// Spin animation
+@keyframes spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
 	}
 }
 
@@ -799,24 +1019,9 @@ export default {
 	display: flex;
 	gap: 4px;
 
-	button {
-		background: none;
-		border: 1px solid var(--color-border);
-		border-radius: 4px;
-		padding: 4px 8px;
-		font-size: 11px;
-		cursor: pointer;
-		transition: all 0.2s ease;
-
-		&.active {
-			background: var(--color-primary);
-			color: white;
-			border-color: var(--color-primary);
-		}
-
-		&:hover:not(.active) {
-			background: var(--color-background-hover);
-		}
+	.nc-button.active {
+		background: var(--color-primary-light) !important;
+		color: var(--color-primary-text) !important;
 	}
 }
 
@@ -843,21 +1048,6 @@ export default {
 	margin-bottom: 16px;
 }
 
-.add-first-task-btn {
-	background: var(--color-primary);
-	color: white;
-	border: none;
-	border-radius: 6px;
-	padding: 8px 16px;
-	cursor: pointer;
-	font-size: 14px;
-	transition: all 0.2s ease;
-
-	&:hover {
-		background: var(--color-primary-hover);
-	}
-}
-
 // Compact view (small widgets)
 .view-compact .tasks-compact {
 	display: flex;
@@ -872,34 +1062,18 @@ export default {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding: 4px 6px;
+	padding: 6px 8px;
 	background: var(--color-background-hover);
-	border-radius: 4px;
-	margin-bottom: 4px;
+	border-radius: 6px;
+	margin-bottom: 6px;
 	flex-shrink: 0;
-}
-
-.compact-add-btn {
-	background: var(--color-primary);
-	border: none;
-	border-radius: 3px;
-	color: white;
-	padding: 2px 6px;
-	cursor: pointer;
-	font-size: 10px;
-}
-
-.compact-filter button {
-	background: none;
 	border: 1px solid var(--color-border);
-	border-radius: 3px;
-	padding: 2px 4px;
-	cursor: pointer;
-	font-size: 10px;
+}
 
-	&.active {
-		background: var(--color-primary);
-		color: white;
+.compact-filter {
+	.compact-btn.active {
+		background: var(--color-primary-light);
+		color: var(--color-primary-text);
 	}
 }
 
@@ -1044,27 +1218,16 @@ export default {
 	align-items: center;
 	gap: 8px;
 	flex-shrink: 0;
+	opacity: 0;
+	transition: opacity 0.2s;
 }
 
 .task-priority {
 	font-size: 14px;
 }
 
-.edit-task-btn {
-	background: none;
-	border: none;
-	cursor: pointer;
-	font-size: 12px;
-	padding: 4px;
-	border-radius: 3px;
-	opacity: 0.5;
-	transition: all 0.2s ease;
-
-	&:hover {
-		opacity: 1;
-		background: var(--color-background-dark);
-		transform: scale(1.1);
-	}
+.task-item:hover .task-actions {
+	opacity: 1;
 }
 
 // Detailed view (large widgets)
@@ -1089,6 +1252,15 @@ export default {
 		.task-title-detailed {
 			text-decoration: line-through;
 		}
+	}
+
+	.task-edit-btn-detailed {
+		opacity: 0;
+		transition: opacity 0.2s;
+	}
+
+	&:hover .task-edit-btn-detailed {
+		opacity: 1;
 	}
 }
 
@@ -1289,7 +1461,10 @@ export default {
 }
 
 .btn-cancel, .btn-delete, .btn-save {
-	padding: 10px 20px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 12px 20px;
 	border: none;
 	border-radius: 8px;
 	font-size: 14px;
@@ -1297,11 +1472,25 @@ export default {
 	cursor: pointer;
 	transition: all 0.2s ease;
 	min-width: 100px;
+	justify-content: center;
+
+	svg {
+		flex-shrink: 0;
+		transition: transform 0.2s ease;
+	}
+
+	&:hover:not(:disabled) svg {
+		transform: scale(1.1);
+	}
 
 	&:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
 		transform: none !important;
+		
+		svg {
+			transform: none !important;
+		}
 	}
 }
 

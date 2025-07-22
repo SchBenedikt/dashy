@@ -575,60 +575,6 @@ class ApiController extends Controller {
 	}
 
 	/**
-	 * Get contacts information
-	 *
-	 * @return DataResponse<Http::STATUS_OK, array{contacts: array}, array{}>
-	 *
-	 * 200: Contacts information returned
-	 */
-	#[NoAdminRequired]
-	public function getContacts(): DataResponse {
-		$userId = $this->getUserId();
-		if (empty($userId)) {
-			return new DataResponse(['contacts' => []]);
-		}
-
-		try {
-			// Check if Contacts app is enabled
-			if (!$this->appManager->isEnabledForUser('contacts')) {
-				return new DataResponse(['contacts' => []], Http::STATUS_NOT_FOUND);
-			}
-
-			// Get contacts from the database
-			$qb = $this->db->getQueryBuilder();
-			$contactsQuery = $qb->select('id', 'displayname', 'carddata')
-				->from('cards')
-				->leftJoin('cards', 'addressbooks', 'ab', 'cards.addressbookid = ab.id')
-				->where($qb->expr()->eq('ab.principaluri', $qb->createNamedParameter('principals/users/' . $userId)))
-				->orderBy('displayname', 'ASC')
-				->setMaxResults(50);
-			
-			$contactsResult = $contactsQuery->executeQuery();
-			$contacts = [];
-			
-			while ($contact = $contactsResult->fetch()) {
-				// Parse VCard data to extract email and phone
-				$cardData = $contact['carddata'];
-				$email = $this->extractVCardProperty($cardData, 'EMAIL');
-				$phone = $this->extractVCardProperty($cardData, 'TEL');
-				
-				$contacts[] = [
-					'id' => $contact['id'],
-					'displayName' => $contact['displayname'] ?: 'Unknown',
-					'email' => $email,
-					'phone' => $phone,
-				];
-			}
-			$contactsResult->closeCursor();
-			
-			return new DataResponse(['contacts' => $contacts]);
-			
-		} catch (\Exception $e) {
-			return new DataResponse(['contacts' => []], Http::STATUS_INTERNAL_SERVER_ERROR);
-		}
-	}
-
-	/**
 	 * Get files information
 	 *
 	 * @return DataResponse<Http::STATUS_OK, array{files: array}, array{}>
