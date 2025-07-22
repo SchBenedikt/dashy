@@ -2,6 +2,13 @@
 
 A modern, customizable dashboard app for Nextcloud that allows users to create and personalize their workspace with interactive widgets. **All widgets integrate with real data from your Nextcloud apps.**
 
+<img width="5088" height="2662"  src="https://github.com/user-attachments/assets/505bf542-e7b6-417e-9165-3b14b1a02895" />
+<p float="left">
+  <img alt="image" src="https://github.com/user-attachments/assets/dd37d4b9-fb5a-45ae-9fec-79758f6ffeb1" width="45%" />
+  <img src="https://github.com/user-attachments/assets/5c71b774-5eb5-4310-99a9-07ab1f701efe" width="45%" />
+</p>
+
+
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Nextcloud App Store](https://img.shields.io/badge/Nextcloud-App%20Store-blue)](https://apps.nextcloud.com/)
 
