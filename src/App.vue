@@ -140,6 +140,7 @@ import AccountMultipleIcon from 'vue-material-design-icons/AccountMultiple.vue'
 import FolderIcon from 'vue-material-design-icons/Folder.vue'
 import NoteTextIcon from 'vue-material-design-icons/NoteText.vue'
 import BookmarkIcon from 'vue-material-design-icons/Bookmark.vue'
+import ForumIcon from 'vue-material-design-icons/Forum.vue'
 import RobotIcon from './icons/RobotIcon.vue'
 import { nextTick } from 'vue'
 
@@ -210,6 +211,18 @@ export default {
 		  name: t('dashy', 'Bookmarks'),
 		  description: t('dashy', 'Your saved bookmarks'),
 		  icon: BookmarkIcon,
+		},
+		{
+		  type: 'talk',
+		  name: t('dashy', 'Talk'),
+		  description: t('dashy', 'Recent conversations'),
+		  icon: ForumIcon,
+		},
+		{
+		  type: 'contacts',
+		  name: t('dashy', 'Contacts'),
+		  description: t('dashy', 'Recent or important contacts'),
+		  icon: AccountMultipleIcon,
 		},
 	  ],
 	  appLogo,

@@ -90,6 +90,8 @@ import FilesWidget from './widgets/FilesWidget.vue'
 import NotesWidget from './widgets/NotesWidget.vue'
 import BookmarksWidget from './widgets/BookmarksWidget.vue'
 import AiChatWidget from './widgets/AiChatWidget.vue'
+import TalkWidget from './widgets/TalkWidget.vue'
+import ContactsWidget from './widgets/ContactsWidget.vue'
 
 // Settings components
 import CalendarSettings from './widgets/CalendarSettings.vue'
@@ -100,6 +102,8 @@ import FilesSettings from './widgets/FilesSettings.vue'
 import NotesSettings from './widgets/NotesSettings.vue'
 import BookmarksSettings from './widgets/BookmarksSettings.vue'
 import AiChatSettings from './widgets/AiChatSettings.vue'
+import TalkSettings from './widgets/TalkSettings.vue'
+import ContactsSettings from './widgets/ContactsSettings.vue'
 
 export default {
   name: 'WidgetContainer',
@@ -131,6 +135,8 @@ export default {
 		notes: NotesWidget,
 		bookmarks: BookmarksWidget,
 		ai: AiChatWidget,
+		talk: TalkWidget,
+		contacts: ContactsWidget,
 	  }
 	  return components[this.widget.type] || null
 	},
@@ -145,6 +151,8 @@ export default {
 		notes: NotesSettings,
 		bookmarks: BookmarksSettings,
 		ai: AiChatSettings,
+		talk: TalkSettings,
+		contacts: ContactsSettings,
 	  }
 	  return components[this.widget.type] || null
 	},

@@ -1447,4 +1447,104 @@ class ApiController extends Controller {
 		
 		return $filename;
 	}
+
+	/**
+	 * Get contacts
+	 *
+	 * @return DataResponse<Http::STATUS_OK, array{contacts: array}, array{}>
+	 *
+	 * 200: Contacts information returned
+	 */
+	#[NoAdminRequired]
+	public function getContacts(): DataResponse {
+		$userId = $this->getUserId();
+		if (empty($userId)) {
+			return new DataResponse(['contacts' => []]);
+		}
+
+		try {
+			$qb = $this->db->getQueryBuilder();
+			
+			// Get addressbooks for this user
+			$booksQuery = $qb->select('id', 'displayname')
+				->from('addressbooks')
+				->where($qb->expr()->eq('principaluri', $qb->createNamedParameter('principals/users/' . $userId)));
+			
+			$booksResult = $booksQuery->executeQuery();
+			$bookIds = [];
+			
+			while ($book = $booksResult->fetch()) {
+				$bookIds[] = (int)$book['id'];
+			}
+			$booksResult->closeCursor();
+			
+			if (empty($bookIds)) {
+				return new DataResponse(['contacts' => []]);
+			}
+			
+			// Get contacts (cards)
+			$qb = $this->db->getQueryBuilder();
+			$cardsQuery = $qb->select('carddata', 'uri')
+				->from('cards')
+				->where($qb->expr()->in('addressbookid', $qb->createNamedParameter($bookIds, \OCP\DB\QueryBuilder\IQueryBuilder::PARAM_INT_ARRAY)))
+				->setMaxResults(20);
+			
+			$cardsResult = $cardsQuery->executeQuery();
+			$contacts = [];
+			
+			while ($row = $cardsResult->fetch()) {
+				$cardData = $row['carddata'];
+				$contact = $this->parseVCard($cardData);
+				if ($contact) {
+					$contacts[] = $contact;
+				}
+			}
+			$cardsResult->closeCursor();
+			
+			return new DataResponse(['contacts' => $contacts]);
+			
+		} catch (\Exception $e) {
+			// If table doesn't exist or other error, return empty
+			return new DataResponse(['contacts' => []]);
+		}
+	}
+
+	/**
+	 * Parse basic info from VCard data
+	 */
+	private function parseVCard(string $cardData): ?array {
+		$fn = '';
+		$email = '';
+		$photo = false;
+		
+		$lines = explode("\n", $cardData);
+		foreach ($lines as $line) {
+			if (strpos($line, 'FN:') === 0 || strpos($line, 'FN;') === 0) {
+				$parts = explode(':', $line, 2);
+				if (count($parts) === 2) {
+					$fn = trim($parts[1]);
+				}
+			}
+			if (strpos($line, 'EMAIL') === 0) {
+				$parts = explode(':', $line, 2);
+				if (count($parts) === 2) {
+					$email = trim($parts[1]);
+				}
+			}
+			if (strpos($line, 'PHOTO') === 0) {
+				$photo = true;
+			}
+		}
+
+		if (!empty($fn)) {
+			return [
+				'fn' => $fn,
+				'email' => $email,
+				'hasPhoto' => $photo,
+				'initials' => strtoupper(substr($fn, 0, 2))
+			];
+		}
+		
+		return null;
+	}
 }
